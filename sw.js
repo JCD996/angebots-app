@@ -1,5 +1,5 @@
 // App-Hülle offline verfügbar halten; neue Version wird beim nächsten Start geladen.
-const CACHE = "angebot-v1";
+const CACHE = "angebot-v2";
 const FILES = [
   "./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png", "./icon-180.png",
   "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
