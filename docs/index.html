@@ -116,6 +116,11 @@ table.cat input,table.cat select{padding:8px;font-size:14px}
       <button class="mic" id="micBtn" aria-label="Aufnahme starten"><svg class="ic"><use href="#i-mic"/></svg></button>
       <div class="mic-label" id="micLabel">Tippen und sprechen</div>
       <p class="hint" id="micHint">Kunde, Adresse, Räume, Maße und Leistungen frei beschreiben.</p>
+      <p class="hint hidden" id="micLive" style="color:var(--text);font-style:italic"></p>
+    </div>
+    <div class="warnbox hidden" id="kiHinweis" style="margin:0 0 12px">
+      <b>KI noch nicht verbunden.</b> Ohne Anthropic-Schlüssel kann die App aus dem Diktat kein Angebot erstellen.
+      <div class="btns" style="margin-top:10px"><button class="btn sec" id="kiEinrichten" style="min-height:40px">Schlüssel eintragen</button></div>
     </div>
     <textarea id="diktat" placeholder="z. B.: Angebot für Familie Müller, Hauptstraße 5 in 12345 Musterstadt. Bad im Obergeschoss, Boden 2,40 mal 3 Meter, alte Fliesen raus, Abdichtung, neue Bodenfliesen 60 mal 60, Wände rundum bis 2 Meter hoch fliesen, bodengleiche Dusche mit Rinne …"></textarea>
     <div class="btns">
@@ -307,7 +312,7 @@ document.querySelectorAll("[data-s]").forEach(el => {
   if(el.type==="checkbox") el.checked = !!S[k]; else el.value = S[k] ?? "";
   el.addEventListener("change", () => {
     S[k] = el.type==="checkbox" ? el.checked : (el.type==="number" ? Number(el.value) : el.value.trim());
-    store.set("settings", S); applyBranding(); versandAnzeigen();
+    store.set("settings", S); applyBranding(); versandAnzeigen(); kiHinweis();
   });
 });
 $("logoFile").onchange = e => {
@@ -363,25 +368,61 @@ function fillKatSelect(){
 
 /* ---------- Spracheingabe ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null, recording = false;
-if(!SR){ $("micBtn").classList.add("hidden"); $("micLabel").classList.add("hidden"); $("micHint").textContent = "Im Textfeld das Mikrofon der Handy-Tastatur antippen und frei sprechen: Kunde, Adresse, Räume, Maße und Leistungen."; }
+const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+const ANDROID = /Android/.test(navigator.userAgent);
+const STANDALONE = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+const TASTATUR_TIPP = "Ins Textfeld tippen und das Mikrofon-Symbol der Handy-Tastatur nutzen – das funktioniert immer.";
+let rec = null, recording = false, gehoert = false, neustarts = [];
+function micAus(grund){
+  $("micBtn").classList.add("hidden"); $("micLabel").classList.add("hidden");
+  $("micHint").textContent = (grund ? grund+" " : "") + TASTATUR_TIPP;
+}
+// Auf dem iPhone funktioniert die Browser-Spracherkennung als Startbildschirm-App nicht zuverlässig.
+if(!SR) micAus("");
+else if(IOS && STANDALONE) micAus("Auf dem iPhone bitte so diktieren:");
 $("micBtn").onclick = () => recording ? stopRec() : startRec();
 function startRec(){
-  rec = new SR(); rec.lang = "de-DE"; rec.continuous = true; rec.interimResults = false;
+  rec = new SR(); rec.lang = "de-DE"; rec.interimResults = true;
+  rec.continuous = !ANDROID; // Android liefert im Dauermodus doppelte Texte, dort Satz für Satz neu starten
+  gehoert = false; neustarts = [];
   rec.onresult = e => {
-    for(let i=e.resultIndex; i<e.results.length; i++) if(e.results[i].isFinal){
-      const ta = $("diktat"); ta.value = (ta.value.trim() + " " + e.results[i][0].transcript.trim()).trim();
+    let zwischen = "";
+    for(let i=e.resultIndex; i<e.results.length; i++){
+      const t = e.results[i][0].transcript.trim();
+      if(e.results[i].isFinal){ if(t){ const ta = $("diktat"); ta.value = (ta.value.trim()+" "+t).trim(); gehoert = true; } }
+      else zwischen += t+" ";
     }
+    $("micLive").textContent = zwischen.trim(); $("micLive").classList.toggle("hidden", !zwischen.trim());
   };
-  rec.onerror = e => { if(e.error==="not-allowed"){ toast("Mikrofon nicht erlaubt"); stopRec(); } };
-  rec.onend = () => { if(recording) try{ rec.start(); }catch(_){} }; // Handys stoppen nach Pausen
-  rec.start(); recording = true;
+  rec.onerror = e => {
+    const meldungen = {
+      "not-allowed": "Mikrofon ist für diese Seite nicht erlaubt. In den Handy-Einstellungen für den Browser erlauben.",
+      "service-not-allowed": "Spracherkennung ist in diesem Browser nicht verfügbar.",
+      "audio-capture": "Kein Mikrofon gefunden.",
+      "network": "Spracherkennung braucht eine Internetverbindung.",
+      "language-not-supported": "Deutsche Spracherkennung ist auf diesem Gerät nicht verfügbar."
+    };
+    if(meldungen[e.error]){ stopRec(); toast(meldungen[e.error]+" "+TASTATUR_TIPP, 8000); }
+  };
+  rec.onend = () => {
+    if(!recording) return;
+    // Handys beenden die Erkennung nach Pausen – neu starten, aber nicht endlos, falls sie sofort wieder abbricht
+    const jetzt = Date.now(); neustarts = neustarts.filter(t => jetzt-t < 4000); neustarts.push(jetzt);
+    if(neustarts.length > 4){ stopRec(); toast("Die Spracherkennung bricht immer wieder ab. "+TASTATUR_TIPP, 8000); return; }
+    try{ rec.start(); }catch(_){}
+  };
+  try{ rec.start(); }catch(e){ toast("Spracherkennung konnte nicht starten. "+TASTATUR_TIPP, 8000); return; }
+  recording = true;
   $("micBtn").classList.add("rec"); $("micBtn").innerHTML = ic("stop"); $("micLabel").textContent = "Aufnahme läuft – tippen zum Beenden";
 }
 function stopRec(){
-  recording = false; try{ rec && rec.stop(); }catch(_){}
+  const war = recording; recording = false; try{ rec && rec.stop(); }catch(_){}
   $("micBtn").classList.remove("rec"); $("micBtn").innerHTML = ic("mic"); $("micLabel").textContent = "Tippen und sprechen";
+  $("micLive").classList.add("hidden");
+  if(war) setTimeout(() => { if(!gehoert) toast("Es wurde nichts erkannt. "+TASTATUR_TIPP, 7000); }, 800);
 }
+function kiHinweis(){ $("kiHinweis").classList.toggle("hidden", !!S.apiKey); }
+$("kiEinrichten").onclick = () => { showTab("einst"); setTimeout(() => document.querySelector('[data-s="apiKey"]').scrollIntoView({block:"center"}), 50); };
 
 /* ---------- KI ---------- */
 const SCHEMA = {
@@ -724,7 +765,7 @@ $("sendBtn").onclick = async () => {
 };
 
 /* ---------- Start ---------- */
-applyBranding(); fillKatSelect(); versandAnzeigen();
+applyBranding(); fillKatSelect(); versandAnzeigen(); kiHinweis();
 if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 </body>
