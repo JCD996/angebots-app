@@ -636,14 +636,15 @@ function pdfErstellen(){
   y += 4;
 
   // Schlusstexte
-  doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
+  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setLineHeightFactor(1.3);
+  const LH = 9 * 0.3528 * 1.3; // Zeilenhöhe in mm
   const texte = [];
   if(cur.reverseCharge) texte.push("Steuerschuldnerschaft des Leistungsempfängers gemäß § 13b UStG.");
   texte.push("Zahlungsbedingungen: "+(S.zahlung||""));
   texte.push("Dieses Angebot ist gültig bis "+fmtDate(bis)+". Mengen werden nach tatsächlichem Aufmaß abgerechnet.");
-  texte.push(S.schluss||"");
-  texte.push("Mit freundlichen Grüßen\n"+(S.inhaber||"")+(S.inhaber&&S.firma?" · ":"")+(S.firma||""));
-  texte.filter(Boolean).forEach(t => { const ls = doc.splitTextToSize(t, R-L); if(y + ls.length*4.2 > 268){ doc.addPage(); y = 25; } doc.text(ls, L, y); y += ls.length*4.2 + 2.5; });
+  // Schlusstext und Gruß als ein Block, damit der Gruß nie allein auf einer Seite steht
+  texte.push((S.schluss ? S.schluss+"\n" : "")+"Mit freundlichen Grüßen\n"+(S.inhaber||"")+(S.inhaber&&S.firma?" · ":"")+(S.firma||""));
+  texte.filter(Boolean).forEach(t => { const ls = doc.splitTextToSize(t, R-L); if(y + (ls.length-1)*LH > 268){ doc.addPage(); y = 25; } doc.text(ls, L, y); y += ls.length*LH + 2; });
 
   // Fußzeile alle Seiten
   const pages = doc.getNumberOfPages();
