@@ -206,15 +206,16 @@ table.cat input,table.cat select{padding:8px;font-size:14px}
     <label style="color:var(--text)"><input type="checkbox" data-s="reverseCharge">Hinweis §13b UStG (Bauleistung an Bauunternehmer) anbieten</label>
   </div>
   <div class="card">
-    <h2>KI-Zugang</h2>
-    <label>Anthropic API-Schlüssel</label><input data-s="apiKey" type="password" autocomplete="off" placeholder="sk-ant-…">
-    <p class="hint">Prototyp: Der Schlüssel wird nur auf diesem Gerät gespeichert und direkt an die Anthropic-API gesendet. Für den Echtbetrieb gehört er auf einen Server.</p>
-  </div>
-  <div class="card">
-    <h2>E-Mail-Versand (optional)</h2>
-    <p class="hint">Mit eingerichtetem Versand-Server landet das Angebot direkt im Postfach – ohne Teilen-Menü. Leer lassen, wenn kein Server eingerichtet ist.</p>
-    <label>Versand-Adresse</label><input data-s="versandUrl" type="url" placeholder="https://ihre-firma.netlify.app/api/senden" autocomplete="off">
-    <label>Versand-Schlüssel</label><input data-s="versandToken" type="password" autocomplete="off">
+    <h2>Zugang</h2>
+    <label>Zugangs-PIN</label><input data-s="pin" type="password" autocomplete="off" inputmode="text">
+    <p class="hint">Einmal eintragen. Damit nutzt die App die KI und den E-Mail-Versand Ihres Servers.</p>
+    <div id="kiDirekt" class="hidden">
+      <label>Anthropic API-Schlüssel (nur ohne eigenen Server)</label><input data-s="apiKey" type="password" autocomplete="off" placeholder="sk-ant-…">
+      <p class="hint">Wird nur auf diesem Gerät gespeichert und direkt an Anthropic gesendet.</p>
+    </div>
+    <details style="margin-top:12px"><summary class="hint" style="cursor:pointer">Erweitert</summary>
+      <label>Server-Adresse (nur wenn die App woanders liegt als der Server)</label><input data-s="serverUrl" type="url" placeholder="https://ihre-firma.netlify.app" autocomplete="off">
+    </details>
   </div>
   <div class="card">
     <h2>Daten</h2>
@@ -244,7 +245,7 @@ const DEFAULT_SETTINGS = {
   farbe:"#1f4e79", logo:"", mwst:19, gueltig:30, nextNr:1,
   zahlung:"Zahlbar nach Baufortschritt gemäß Abschlagsrechnungen, Schlussrechnung innerhalb von 14 Tagen ohne Abzug.",
   schluss:"Wir würden uns freuen, den Auftrag für Sie ausführen zu dürfen. Bei Fragen stehen wir Ihnen jederzeit gerne zur Verfügung.",
-  reverseCharge:false, apiKey:"", versandUrl:"", versandToken:""
+  reverseCharge:false, apiKey:"", serverUrl:"", pin:""
 };
 
 const DEFAULT_KATALOG = [
@@ -329,7 +330,7 @@ $("logoFile").onchange = e => {
 };
 $("logoDel").onclick = () => { S.logo=""; store.set("settings", S); applyBranding(); };
 $("exportBtn").onclick = () => {
-  const data = {settings:Object.assign({}, S, {apiKey:"", versandToken:""}), katalog:KAT, angebote:store.get("angebote", [])};
+  const data = {settings:Object.assign({}, S, {apiKey:"", pin:""}), katalog:KAT, angebote:store.get("angebote", [])};
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:"application/json"}));
   a.download = "angebots-app-sicherung.json"; a.click();
 };
@@ -337,7 +338,7 @@ $("importFile").onchange = async e => {
   const f = e.target.files[0]; if(!f) return;
   try{
     const d = JSON.parse(await f.text());
-    if(d.settings){ S = Object.assign({}, DEFAULT_SETTINGS, d.settings, {apiKey:S.apiKey, versandToken:S.versandToken}); store.set("settings", S); }
+    if(d.settings){ S = Object.assign({}, DEFAULT_SETTINGS, d.settings, {apiKey:S.apiKey, pin:S.pin}); store.set("settings", S); }
     if(d.katalog){ KAT = d.katalog; store.set("katalog", KAT); }
     if(d.angebote){ store.set("angebote", d.angebote); }
     toast("Sicherung importiert"); setTimeout(()=>location.reload(), 800);
@@ -427,76 +428,44 @@ function stopRec(){
   $("micLive").classList.add("hidden");
   if(war) setTimeout(() => { if(!gehoert) toast("Es wurde nichts erkannt. "+TASTATUR_TIPP, 7000); }, 800);
 }
-function kiHinweis(){ $("kiHinweis").classList.toggle("hidden", !!S.apiKey); }
-$("kiEinrichten").onclick = () => { showTab("einst"); setTimeout(() => document.querySelector('[data-s="apiKey"]').scrollIntoView({block:"center"}), 50); };
-
-/* ---------- KI ---------- */
-const SCHEMA = {
-  type:"object", additionalProperties:false,
-  required:["kunde","bauvorhaben","einleitung","positionen","rueckfragen"],
-  properties:{
-    kunde:{type:"object",additionalProperties:false,required:["name","strasse","plz_ort","email","telefon"],
-      properties:{name:{type:"string"},strasse:{type:"string"},plz_ort:{type:"string"},email:{type:"string"},telefon:{type:"string"}}},
-    bauvorhaben:{type:"string"},
-    einleitung:{type:"string"},
-    positionen:{type:"array",items:{type:"object",additionalProperties:false,
-      required:["gruppe","katalog_id","titel","beschreibung","menge","einheit","einzelpreis","pruefen"],
-      properties:{gruppe:{type:"string"},katalog_id:{type:"string"},titel:{type:"string"},beschreibung:{type:"string"},
-        menge:{type:"number"},einheit:{type:"string"},einzelpreis:{type:"number"},pruefen:{type:"boolean"}}}},
-    rueckfragen:{type:"array",items:{type:"string"}}
-  }
+function kiHinweis(){
+  $("kiHinweis").classList.toggle("hidden", kiBereit());
+  $("kiDirekt").classList.toggle("hidden", !!serverBasis());
+}
+$("kiEinrichten").onclick = () => {
+  showTab("einst");
+  setTimeout(() => { const f = document.querySelector(serverBasis() ? '[data-s="pin"]' : '[data-s="apiKey"]'); f.scrollIntoView({block:"center"}); f.focus(); }, 50);
 };
 
-function systemPrompt(){
-  return `Du bist die Kalkulationshilfe eines Fliesenleger- und Ausbaubetriebs (${S.firma}). Der Inhaber spricht auf der Baustelle frei ein, was er gesehen hat und anbieten will. Du machst daraus die Positionen eines Angebots.
-
-Regeln:
-- Nutze bevorzugt Positionen aus dem Leistungskatalog (katalog_id, titel, einheit und einzelpreis exakt aus dem Katalog übernehmen; beschreibung darf um Details aus dem Diktat ergänzt werden, z. B. Fliesenformat oder Raum).
-- Mengen aus genannten Maßen berechnen. Bodenfläche = Länge × Breite. Wandfläche = Umfang × Höhe, abzüglich Türen/Fenster nur wenn genannt. Rechne auf zwei Nachkommastellen. Den Rechenweg kurz in die beschreibung schreiben (z. B. "(2,40 × 3,00 m)").
-- Sinnvolle Begleitpositionen, die fachlich zwingend dazugehören (z. B. Abdichtung im Duschbereich, Silikonfugen, Material), darfst du ergänzen, aber setze dann pruefen=true.
-- Leistungen, die nicht im Katalog stehen: katalog_id="" (leerer String), realistischer Netto-Marktpreis als Schätzung, pruefen=true.
-- Fehlt eine Menge und lässt sie sich nicht ableiten: menge=0, pruefen=true und eine kurze Rückfrage in rueckfragen.
-- gruppe = Raum oder Bauabschnitt (z. B. "Bad OG", "Küche", "Allgemein"). Positionen derselben Gruppe zusammenhängend auflisten.
-- Kundendaten nur übernehmen, wenn sie gesagt wurden, sonst leere Strings. Erfinde keine Namen oder Adressen.
-- bauvorhaben: kurze Bezeichnung, z. B. "Badsanierung Obergeschoss, Hauptstraße 5, Musterstadt".
-- einleitung: ein bis zwei höfliche Sätze für das Angebot, Sie-Form, ohne Anrede.
-- Diktierfehler der Spracherkennung sinnvoll interpretieren.
-
-Leistungskatalog (Preise netto in Euro):
-${KAT.map(p=>`${p.id} | ${p.titel} | ${p.beschreibung} | ${p.einheit} | ${p.preis}`).join("\n")}`;
+/* ---------- Server & KI ---------- */
+// Läuft die App auf dem eigenen Server (Netlify), gehen KI und Versand über /api – der Schlüssel liegt dort.
+// Auf GitHub Pages gibt es keinen Server; dann direkter Modus mit eigenem API-Schlüssel.
+function serverBasis(){
+  if(S.serverUrl) return S.serverUrl.replace(/\/+$/,"");
+  return location.hostname.endsWith("github.io") ? null : location.origin;
 }
+const serverAktiv = () => !!(serverBasis() && S.pin);
+const kiBereit = () => serverAktiv() || !!S.apiKey;
 
 async function kiAuswerten(text){
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST",
-    headers:{
-      "content-type":"application/json",
-      "x-api-key":S.apiKey,
-      "anthropic-version":"2023-06-01",
-      "anthropic-beta":"server-side-fallback-2026-07-01",
-      "anthropic-dangerous-direct-browser-access":"true"
-    },
-    body: JSON.stringify({
-      model:"claude-opus-5-5",
-      max_tokens:16000,
-      fallbacks:"default",
-      output_config:{effort:"medium", format:{type:"json_schema", schema:SCHEMA}},
-      system: systemPrompt(),
-      messages:[{role:"user", content:"Diktat von der Baustelle:\n\n"+text}]
-    })
-  });
-  const data = await res.json().catch(()=>({}));
-  if(!res.ok) throw new Error((data.error && data.error.message) || ("HTTP "+res.status));
-  if(data.stop_reason==="refusal") throw new Error("Die KI hat die Anfrage abgelehnt.");
-  if(data.stop_reason==="max_tokens") throw new Error("Antwort wurde abgeschnitten – Diktat kürzer fassen.");
-  const txt = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("");
-  return JSON.parse(txt);
+  if(serverAktiv()){
+    const res = await fetch(serverBasis()+"/api/ki", {method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify({token:S.pin, firma:S.firma, katalog:KAT, diktat:text})});
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok || !data.ok) throw new Error(data.fehler || "Server antwortet nicht ("+res.status+")");
+    return data.ergebnis;
+  }
+  const ki = await import("./ki.mjs");
+  const res = await fetch(ki.API_URL, {method:"POST",
+    headers:Object.assign({}, ki.API_HEADER, {"x-api-key":S.apiKey, "anthropic-dangerous-direct-browser-access":"true"}),
+    body: JSON.stringify(ki.anfrage(S.firma, KAT, text))});
+  return ki.auswerten(res.status, await res.json().catch(()=>({})));
 }
 
 $("kiBtn").onclick = async () => {
   const text = $("diktat").value.trim();
   if(!text) return toast("Bitte erst etwas einsprechen.");
-  if(!S.apiKey){ toast("Bitte API-Schlüssel in den Einstellungen hinterlegen."); return showTab("einst"); }
+  if(!kiBereit()){ toast("Bitte zuerst die Zugangs-PIN in den Einstellungen eintragen."); return $("kiEinrichten").click(); }
   if(recording) stopRec();
   const b = $("kiBtn"); b.disabled = true; b.innerHTML = '<span class="spinner"></span>Angebot wird erstellt …';
   try{
@@ -723,7 +692,7 @@ function vorPdf(){
 }
 $("pdfBtn").onclick = () => { if(!vorPdf()) return; const d = pdfErstellen(); window.open(URL.createObjectURL(d.output("blob")), "_blank"); };
 /* ---------- Versand ---------- */
-const versandAktiv = () => !!(S.versandUrl && S.versandToken);
+const versandAktiv = serverAktiv;
 function versandAnzeigen(){
   $("entwurfBtn").classList.toggle("hidden", !versandAktiv());
   $("sendHint").textContent = versandAktiv()
@@ -743,8 +712,8 @@ async function serverSenden(modus, btn){
     const body = modus==="entwurf"
       ? {modus, kundeEmail:(cur.kunde.email||"").trim(), betreff:"Ihr Angebot Nr. "+cur.nr+(S.firma?" – "+S.firma:""), text:kundenText()}
       : {modus, betreff:"Angebot "+cur.nr+(cur.kunde.name?" – "+cur.kunde.name:""), text:"Angebot "+cur.nr+" für "+(cur.kunde.name||"Kunde")+" – "+eur(summen().brutto)+" brutto."};
-    const res = await fetch(S.versandUrl, {method:"POST", headers:{"content-type":"application/json"},
-      body: JSON.stringify(Object.assign(body, {token:S.versandToken, pdf, dateiname:dateiname()}))});
+    const res = await fetch(serverBasis()+"/api/senden", {method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify(Object.assign(body, {token:S.pin, pdf, dateiname:dateiname()}))});
     const data = await res.json().catch(()=>({}));
     if(!res.ok || !data.ok) throw new Error(data.fehler || "Server antwortet nicht ("+res.status+")");
     toast(data.meldung, 4000);

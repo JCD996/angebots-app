@@ -74,7 +74,7 @@ await t("Erlaubte Herkunft bekommt CORS-Header, Fehler als deutscher Text", asyn
   const r = await handler(req({ token: "falsch", modus: "mich", pdf: PDF }, "https://jcd996.github.io"));
   assert.equal(r.status, 401);
   assert.equal(r.headers.get("access-control-allow-origin"), "https://jcd996.github.io");
-  assert.match((await r.json()).fehler, /Versand-Schlüssel/);
+  assert.match((await r.json()).fehler, /Zugangs-PIN/);
 });
 
 smtp.close();

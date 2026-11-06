@@ -35,7 +35,7 @@ function tokenOk(erwartet, erhalten) {
 
 export function pruefen(cfg, body) {
   if (!cfg.user || !cfg.pass || !cfg.token) throw new VersandFehler(500, "Versand ist auf dem Server nicht vollständig eingerichtet.");
-  if (!tokenOk(cfg.token, body.token)) throw new VersandFehler(401, "Versand-Schlüssel ist falsch.");
+  if (!tokenOk(cfg.token, body.token)) throw new VersandFehler(401, "Zugangs-PIN ist falsch.");
   if (!["mich", "entwurf"].includes(body.modus)) throw new VersandFehler(400, "Unbekannter Versandmodus.");
   if (typeof body.pdf !== "string" || !body.pdf.length) throw new VersandFehler(400, "PDF fehlt.");
   if (body.pdf.length > MAX_PDF_BASE64) throw new VersandFehler(413, "PDF ist zu groß.");
