@@ -147,12 +147,13 @@ table.cat input,table.cat select{padding:8px;font-size:14px}
     </div>
     <div class="card">
       <div class="step"><b>4</b><h2>Fertigstellen</h2></div>
+      <button class="btn block hidden" id="entwurfBtn" style="margin-bottom:10px"><svg class="ic"><use href="#i-doc-check"/></svg>Als Entwurf ins Postfach</button>
       <button class="btn block" id="sendBtn"><svg class="ic"><use href="#i-mail"/></svg>PDF an mich senden</button>
       <div class="btns">
         <button class="btn sec" id="pdfBtn"><svg class="ic"><use href="#i-eye"/></svg>PDF ansehen</button>
         <button class="btn sec" id="saveBtn"><svg class="ic"><use href="#i-save"/></svg>Speichern</button>
       </div>
-      <p class="hint">„An mich senden" öffnet das Teilen-Menü des Handys mit dem PDF. Dort die Mail-App wählen.</p>
+      <p class="hint" id="sendHint"></p>
     </div>
   </div>
 </section>
@@ -205,6 +206,12 @@ table.cat input,table.cat select{padding:8px;font-size:14px}
     <p class="hint">Prototyp: Der Schlüssel wird nur auf diesem Gerät gespeichert und direkt an die Anthropic-API gesendet. Für den Echtbetrieb gehört er auf einen Server.</p>
   </div>
   <div class="card">
+    <h2>E-Mail-Versand (optional)</h2>
+    <p class="hint">Mit eingerichtetem Versand-Server landet das Angebot direkt im Postfach – ohne Teilen-Menü. Leer lassen, wenn kein Server eingerichtet ist.</p>
+    <label>Versand-Adresse</label><input data-s="versandUrl" type="url" placeholder="https://ihre-firma.netlify.app/api/senden" autocomplete="off">
+    <label>Versand-Schlüssel</label><input data-s="versandToken" type="password" autocomplete="off">
+  </div>
+  <div class="card">
     <h2>Daten</h2>
     <div class="btns"><button class="btn sec" id="exportBtn">Sicherung exportieren</button><label class="btn sec file-btn" style="margin:0">Sicherung importieren<input type="file" id="importFile" accept=".json"></label></div>
   </div>
@@ -232,7 +239,7 @@ const DEFAULT_SETTINGS = {
   farbe:"#1f4e79", logo:"", mwst:19, gueltig:30, nextNr:1,
   zahlung:"Zahlbar nach Baufortschritt gemäß Abschlagsrechnungen, Schlussrechnung innerhalb von 14 Tagen ohne Abzug.",
   schluss:"Wir würden uns freuen, den Auftrag für Sie ausführen zu dürfen. Bei Fragen stehen wir Ihnen jederzeit gerne zur Verfügung.",
-  reverseCharge:false, apiKey:""
+  reverseCharge:false, apiKey:"", versandUrl:"", versandToken:""
 };
 
 const DEFAULT_KATALOG = [
@@ -300,7 +307,7 @@ document.querySelectorAll("[data-s]").forEach(el => {
   if(el.type==="checkbox") el.checked = !!S[k]; else el.value = S[k] ?? "";
   el.addEventListener("change", () => {
     S[k] = el.type==="checkbox" ? el.checked : (el.type==="number" ? Number(el.value) : el.value.trim());
-    store.set("settings", S); applyBranding();
+    store.set("settings", S); applyBranding(); versandAnzeigen();
   });
 });
 $("logoFile").onchange = e => {
@@ -317,7 +324,7 @@ $("logoFile").onchange = e => {
 };
 $("logoDel").onclick = () => { S.logo=""; store.set("settings", S); applyBranding(); };
 $("exportBtn").onclick = () => {
-  const data = {settings:Object.assign({}, S, {apiKey:""}), katalog:KAT, angebote:store.get("angebote", [])};
+  const data = {settings:Object.assign({}, S, {apiKey:"", versandToken:""}), katalog:KAT, angebote:store.get("angebote", [])};
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:"application/json"}));
   a.download = "angebots-app-sicherung.json"; a.click();
 };
@@ -325,7 +332,7 @@ $("importFile").onchange = async e => {
   const f = e.target.files[0]; if(!f) return;
   try{
     const d = JSON.parse(await f.text());
-    if(d.settings){ S = Object.assign({}, DEFAULT_SETTINGS, d.settings, {apiKey:S.apiKey}); store.set("settings", S); }
+    if(d.settings){ S = Object.assign({}, DEFAULT_SETTINGS, d.settings, {apiKey:S.apiKey, versandToken:S.versandToken}); store.set("settings", S); }
     if(d.katalog){ KAT = d.katalog; store.set("katalog", KAT); }
     if(d.angebote){ store.set("angebote", d.angebote); }
     toast("Sicherung importiert"); setTimeout(()=>location.reload(), 800);
@@ -668,7 +675,41 @@ function vorPdf(){
   speichern(); return true;
 }
 $("pdfBtn").onclick = () => { if(!vorPdf()) return; const d = pdfErstellen(); window.open(URL.createObjectURL(d.output("blob")), "_blank"); };
+/* ---------- Versand ---------- */
+const versandAktiv = () => !!(S.versandUrl && S.versandToken);
+function versandAnzeigen(){
+  $("entwurfBtn").classList.toggle("hidden", !versandAktiv());
+  $("sendHint").textContent = versandAktiv()
+    ? "„Als Entwurf ins Postfach“ legt eine fertige E-Mail an den Kunden mit PDF in Ihren Entwürfe-Ordner – dort nur noch prüfen und senden. „An mich senden“ schickt das PDF an Ihre eigene Adresse."
+    : "„An mich senden“ öffnet das Teilen-Menü des Handys mit dem PDF. Dort die Mail-App wählen.";
+}
+function kundenText(){
+  return "Sehr geehrte Damen und Herren,\n\nvielen Dank für Ihre Anfrage. Anbei erhalten Sie unser Angebot Nr. "+cur.nr+
+    (cur.bauvorhaben ? " für das Bauvorhaben „"+cur.bauvorhaben+"“" : "")+".\n\nBei Fragen stehen wir Ihnen gerne zur Verfügung.\n\nMit freundlichen Grüßen\n"+
+    [S.inhaber, S.firma, S.tel && "Tel. "+S.tel].filter(Boolean).join("\n");
+}
+async function serverSenden(modus, btn){
+  if(!vorPdf()) return;
+  const alt = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Wird gesendet …';
+  try{
+    const pdf = pdfErstellen().output("datauristring").split(",")[1];
+    const body = modus==="entwurf"
+      ? {modus, kundeEmail:(cur.kunde.email||"").trim(), betreff:"Ihr Angebot Nr. "+cur.nr+(S.firma?" – "+S.firma:""), text:kundenText()}
+      : {modus, betreff:"Angebot "+cur.nr+(cur.kunde.name?" – "+cur.kunde.name:""), text:"Angebot "+cur.nr+" für "+(cur.kunde.name||"Kunde")+" – "+eur(summen().brutto)+" brutto."};
+    const res = await fetch(S.versandUrl, {method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify(Object.assign(body, {token:S.versandToken, pdf, dateiname:dateiname()}))});
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok || !data.ok) throw new Error(data.fehler || "Server antwortet nicht ("+res.status+")");
+    toast(data.meldung, 4000);
+  }catch(e){ toast("Versand fehlgeschlagen: "+e.message, 7000); }
+  finally{ btn.disabled = false; btn.innerHTML = alt; }
+}
+$("entwurfBtn").onclick = () => {
+  if(!(cur.kunde.email||"").trim() && !confirm("Keine Kunden-E-Mail eingetragen. Entwurf ohne Empfänger anlegen?")) return;
+  serverSenden("entwurf", $("entwurfBtn"));
+};
 $("sendBtn").onclick = async () => {
+  if(versandAktiv()) return serverSenden("mich", $("sendBtn"));
   if(!vorPdf()) return;
   const blob = pdfErstellen().output("blob"), name = dateiname();
   const file = new File([blob], name, {type:"application/pdf"});
@@ -683,7 +724,7 @@ $("sendBtn").onclick = async () => {
 };
 
 /* ---------- Start ---------- */
-applyBranding(); fillKatSelect();
+applyBranding(); fillKatSelect(); versandAnzeigen();
 if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 </body>

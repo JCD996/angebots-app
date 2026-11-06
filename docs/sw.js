@@ -1,5 +1,5 @@
 // App-Hülle offline verfügbar halten; neue Version wird beim nächsten Start geladen.
-const CACHE = "angebot-v2";
+const CACHE = "angebot-v3";
 const FILES = [
   "./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png", "./icon-180.png",
   "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
@@ -11,7 +11,7 @@ self.addEventListener("activate", e => {
   self.clients.claim();
 });
 self.addEventListener("fetch", e => {
-  if (e.request.method !== "GET" || e.request.url.includes("api.anthropic.com")) return;
+  if (e.request.method !== "GET" || e.request.url.includes("api.anthropic.com") || e.request.url.includes("/api/")) return;
   // Netz zuerst (immer aktuelle Version), Cache als Rückfall ohne Empfang
   e.respondWith(fetch(e.request).then(r => {
     const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r;

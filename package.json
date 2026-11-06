@@ -1,0 +1,17 @@
+{
+  "name": "angebots-app",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Angebote per Sprache erstellen – Prototyp für Handwerker",
+  "type": "module",
+  "scripts": {
+    "test": "node test/versand.test.mjs"
+  },
+  "dependencies": {
+    "imapflow": "2.10.2",
+    "nodemailer": "10.3.1"
+  },
+  "devDependencies": {
+    "smtp-server": "3.21.3"
+  }
+}
