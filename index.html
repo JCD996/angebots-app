@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f4e79">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Angebot">
+<title>Angebot per Sprache</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{--brand:#1f4e79;--bg:#f4f5f7;--card:#fff;--text:#1d2329;--muted:#6b7480;--line:#dde1e6;--warn:#fff4d6;--warn-line:#e9b949;--danger:#c0392b}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);padding-bottom:80px}
+header{background:var(--brand);color:#fff;padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top));display:flex;align-items:center;gap:10px}
+header img{height:32px;background:#fff;border-radius:4px;padding:2px}
+header h1{font-size:18px;margin:0;font-weight:600}
+main{max-width:860px;margin:0 auto;padding:12px 16px}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:10}
+nav button{flex:1;border:0;background:none;padding:10px 4px;font-size:13px;color:var(--muted)}
+nav button.active{color:var(--brand);font-weight:600}
+nav button span{display:block;font-size:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+.card h2{font-size:16px;margin:0 0 10px}
+label{display:block;font-size:13px;color:var(--muted);margin:8px 0 3px}
+input,textarea,select{width:100%;font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text)}
+textarea{min-height:140px;resize:vertical}
+.row{display:flex;gap:8px}.row>*{flex:1}
+button.btn{font:inherit;border:0;border-radius:8px;padding:11px 14px;background:var(--brand);color:#fff;font-weight:600;cursor:pointer}
+button.btn.sec{background:#e8ecf1;color:var(--text)}
+button.btn.danger{background:none;color:var(--danger);padding:6px}
+button.btn:disabled{opacity:.5}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.mic{width:100%;padding:16px;font-size:17px}
+.mic.rec{background:var(--danger);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.75}}
+.hint{font-size:13px;color:var(--muted)}
+.warnbox{background:var(--warn);border:1px solid var(--warn-line);border-radius:8px;padding:10px;font-size:14px;margin:8px 0}
+.warnbox ul{margin:4px 0 0;padding-left:18px}
+.pos{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;background:#fff}
+.pos.check{background:var(--warn);border-color:var(--warn-line)}
+.pos .top{display:flex;gap:8px;align-items:center}
+.pos .nr{font-weight:600;min-width:34px}
+.pos .gp{margin-left:auto;font-weight:600;white-space:nowrap}
+.pos .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}
+.pos textarea{min-height:44px}
+.totals{text-align:right;font-size:15px}.totals b{font-size:18px}
+table.cat{width:100%;border-collapse:collapse;font-size:14px}
+table.cat td{padding:4px 3px;border-bottom:1px solid var(--line);vertical-align:top}
+table.cat input,table.cat select{padding:6px;font-size:14px}
+.list-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);gap:8px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-3px;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#1d2329;color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;z-index:20;max-width:90vw}
+.logo-prev{max-height:60px;margin-top:6px}
+</style>
+</head>
+<body>
+<header><img id="hdrLogo" class="hidden" alt=""><h1 id="hdrName">Angebot per Sprache</h1></header>
+<main>
+
+<!-- ===================== ANGEBOT ===================== -->
+<section id="tab-angebot">
+  <div class="card">
+    <h2>1. Baustelle einsprechen</h2>
+    <button class="btn mic" id="micBtn">🎤 Aufnahme starten</button>
+    <p class="hint" id="micHint">Einfach frei sprechen: Kunde, Adresse, Räume, Maße, was gemacht werden soll. Alternativ das Mikrofon der Handy-Tastatur im Textfeld nutzen.</p>
+    <textarea id="diktat" placeholder="z. B.: Angebot für Familie Müller, Hauptstraße 5 in 12345 Musterstadt. Bad im Obergeschoss, Boden 2,40 mal 3 Meter, alte Fliesen raus, Abdichtung, neue Bodenfliesen 60 mal 60, Wände rundum bis 2 Meter hoch fliesen, bodengleiche Dusche mit Rinne …"></textarea>
+    <div class="btns">
+      <button class="btn" id="kiBtn">✨ Angebot erstellen</button>
+      <button class="btn sec" id="leerBtn">Ohne KI, manuell</button>
+    </div>
+  </div>
+
+  <div id="angebotEditor" class="hidden">
+    <div id="rueckfragen"></div>
+    <div class="card">
+      <h2>2. Kunde &amp; Bauvorhaben</h2>
+      <label>Name</label><input id="k_name">
+      <label>Straße</label><input id="k_strasse">
+      <div class="row"><div><label>PLZ / Ort</label><input id="k_ort"></div></div>
+      <div class="row"><div><label>E-Mail</label><input id="k_email" type="email"></div><div><label>Telefon</label><input id="k_tel" type="tel"></div></div>
+      <label>Bauvorhaben</label><input id="bauvorhaben">
+      <label>Einleitungstext</label><textarea id="einleitung" style="min-height:70px"></textarea>
+    </div>
+    <div class="card">
+      <h2>3. Positionen prüfen</h2>
+      <p class="hint">Gelb markiert = Preis/Menge bitte prüfen (nicht aus dem Katalog oder unklar).</p>
+      <div id="positionen"></div>
+      <div class="row">
+        <select id="katAdd"><option value="">+ Position aus Katalog …</option></select>
+      </div>
+      <div class="btns"><button class="btn sec" id="freiAdd">+ Freie Position</button></div>
+      <div class="totals" id="summen" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <h2>4. Fertigstellen</h2>
+      <div class="btns">
+        <button class="btn" id="sendBtn">📧 PDF an mich senden</button>
+        <button class="btn sec" id="pdfBtn">PDF ansehen</button>
+        <button class="btn sec" id="saveBtn">Speichern</button>
+      </div>
+      <p class="hint">„An mich senden" öffnet das Teilen-Menü des Handys mit dem PDF – dort die Mail-App wählen. Ist Teilen nicht möglich, wird das PDF geladen und eine Mail an Ihre Adresse vorbereitet.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== ARCHIV ===================== -->
+<section id="tab-archiv" class="hidden">
+  <div class="card"><h2>Gespeicherte Angebote</h2><div id="archivList"></div></div>
+</section>
+
+<!-- ===================== KATALOG ===================== -->
+<section id="tab-katalog" class="hidden">
+  <div class="card">
+    <h2>Leistungskatalog</h2>
+    <p class="hint">Diese Positionen und Preise (netto) nutzt die KI. Alle Preise sind Beispielwerte – bitte an die eigene Kalkulation anpassen.</p>
+    <div style="overflow-x:auto"><table class="cat" id="katTable"></table></div>
+    <div class="btns">
+      <button class="btn sec" id="katNeu">+ Position</button>
+      <button class="btn sec" id="katReset">Beispielkatalog laden</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== EINSTELLUNGEN ===================== -->
+<section id="tab-einst" class="hidden">
+  <div class="card">
+    <h2>Firma &amp; Erscheinungsbild</h2>
+    <label>Firmenname</label><input data-s="firma">
+    <label>Inhaber / Ansprechpartner</label><input data-s="inhaber">
+    <label>Straße</label><input data-s="strasse">
+    <label>PLZ / Ort</label><input data-s="ort">
+    <div class="row"><div><label>Telefon</label><input data-s="tel"></div><div><label>E-Mail (Angebote gehen hierhin)</label><input data-s="email" type="email"></div></div>
+    <label>Webseite</label><input data-s="web">
+    <div class="row"><div><label>Steuernummer</label><input data-s="steuernr"></div><div><label>USt-IdNr.</label><input data-s="ustid"></div></div>
+    <label>Bank</label><input data-s="bank">
+    <div class="row"><div><label>IBAN</label><input data-s="iban"></div><div><label>BIC</label><input data-s="bic"></div></div>
+    <label>Hausfarbe</label><input data-s="farbe" type="color" style="height:44px">
+    <label>Logo (PNG/JPG)</label><input type="file" id="logoFile" accept="image/*">
+    <img id="logoPrev" class="logo-prev hidden" alt="Logo"><button class="btn danger hidden" id="logoDel">Logo entfernen</button>
+  </div>
+  <div class="card">
+    <h2>Angebotstexte</h2>
+    <div class="row"><div><label>MwSt. %</label><input data-s="mwst" type="number" step="1"></div><div><label>Gültigkeit (Tage)</label><input data-s="gueltig" type="number"></div><div><label>Nächste Nr.</label><input data-s="nextNr" type="number"></div></div>
+    <label>Zahlungsbedingungen</label><textarea data-s="zahlung" style="min-height:60px"></textarea>
+    <label>Schlusstext</label><textarea data-s="schluss" style="min-height:80px"></textarea>
+    <label><input type="checkbox" data-s="reverseCharge" style="width:auto"> Hinweis §13b UStG (Bauleistung an Bauunternehmer) anbieten</label>
+  </div>
+  <div class="card">
+    <h2>KI-Zugang</h2>
+    <label>Anthropic API-Schlüssel</label><input data-s="apiKey" type="password" autocomplete="off" placeholder="sk-ant-…">
+    <p class="hint">Prototyp: Der Schlüssel wird nur auf diesem Gerät gespeichert und direkt an die Anthropic-API gesendet. Für den Echtbetrieb gehört er auf einen Server.</p>
+  </div>
+  <div class="card">
+    <h2>Daten</h2>
+    <div class="btns"><button class="btn sec" id="exportBtn">Sicherung exportieren</button><label class="btn sec" style="margin:0;color:var(--text)">Sicherung importieren<input type="file" id="importFile" accept=".json" class="hidden"></label></div>
+  </div>
+</section>
+</main>
+
+<nav>
+  <button data-tab="angebot" class="active"><span>📝</span>Angebot</button>
+  <button data-tab="archiv"><span>📁</span>Archiv</button>
+  <button data-tab="katalog"><span>📋</span>Katalog</button>
+  <button data-tab="einst"><span>⚙️</span>Einstellungen</button>
+</nav>
+
+<script>
+"use strict";
+/* ---------- Speicher ---------- */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem("ang_"+k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem("ang_"+k, JSON.stringify(v)); }catch(e){ toast("Speichern fehlgeschlagen: "+e.message); } }
+};
+
+const DEFAULT_SETTINGS = {
+  firma:"Ihre Firma GmbH", inhaber:"Max Mustermann", strasse:"Musterstraße 1", ort:"12345 Musterstadt",
+  tel:"0123 456789", email:"", web:"", steuernr:"", ustid:"", bank:"", iban:"", bic:"",
+  farbe:"#1f4e79", logo:"", mwst:19, gueltig:30, nextNr:1,
+  zahlung:"Zahlbar nach Baufortschritt gemäß Abschlagsrechnungen, Schlussrechnung innerhalb von 14 Tagen ohne Abzug.",
+  schluss:"Wir würden uns freuen, den Auftrag für Sie ausführen zu dürfen. Bei Fragen stehen wir Ihnen jederzeit gerne zur Verfügung.",
+  reverseCharge:false, apiKey:""
+};
+
+const DEFAULT_KATALOG = [
+  {id:"A01",gewerk:"Fliesen",titel:"Bodenfliesen entfernen",beschreibung:"Vorhandenen Fliesenbelag inkl. Kleberreste entfernen, Schutt abtransportieren und fachgerecht entsorgen.",einheit:"m²",preis:28},
+  {id:"A02",gewerk:"Fliesen",titel:"Wandfliesen entfernen",beschreibung:"Vorhandene Wandfliesen abschlagen, Untergrund grob säubern, Entsorgung.",einheit:"m²",preis:25},
+  {id:"A03",gewerk:"Fliesen",titel:"Baustelleneinrichtung und Abdeckarbeiten",beschreibung:"Einrichten der Baustelle, Abdecken angrenzender Bauteile, Staubschutz.",einheit:"psch",preis:150},
+  {id:"U01",gewerk:"Fliesen",titel:"Untergrund reinigen und grundieren",beschreibung:"Untergrund prüfen, reinigen und mit geeigneter Grundierung vorbehandeln.",einheit:"m²",preis:4.5},
+  {id:"U02",gewerk:"Fliesen",titel:"Ausgleichsmasse bis 10 mm",beschreibung:"Boden mit selbstverlaufender Ausgleichsmasse egalisieren, Schichtdicke bis 10 mm.",einheit:"m²",preis:18},
+  {id:"U03",gewerk:"Fliesen",titel:"Entkopplungsmatte verlegen",beschreibung:"Entkopplungs- und Abdichtungsmatte vollflächig im Dünnbett verlegen.",einheit:"m²",preis:32},
+  {id:"U04",gewerk:"Fliesen",titel:"Verbundabdichtung Nassbereich",beschreibung:"Flüssige Verbundabdichtung zweilagig inkl. Dichtband in Ecken und Anschlüssen.",einheit:"m²",preis:38},
+  {id:"U05",gewerk:"Fliesen",titel:"Dichtmanschetten",beschreibung:"Dichtmanschetten an Rohrdurchführungen und Bodenabläufen einbauen.",einheit:"Stk",preis:12},
+  {id:"F01",gewerk:"Fliesen",titel:"Bodenfliesen verlegen bis 60x60 cm",beschreibung:"Bodenfliesen im Dünnbett verlegen und verfugen, Format bis 60x60 cm.",einheit:"m²",preis:48},
+  {id:"F02",gewerk:"Fliesen",titel:"Großformatfliesen verlegen ab 60x120 cm",beschreibung:"Großformatige Fliesen im kombinierten Verfahren verlegen und verfugen.",einheit:"m²",preis:72},
+  {id:"F03",gewerk:"Fliesen",titel:"Wandfliesen verlegen",beschreibung:"Wandfliesen im Dünnbett verlegen und verfugen.",einheit:"m²",preis:52},
+  {id:"F04",gewerk:"Fliesen",titel:"Mosaik verlegen",beschreibung:"Mosaikfliesen auf Netz verlegen und verfugen.",einheit:"m²",preis:95},
+  {id:"F05",gewerk:"Fliesen",titel:"Fliesensockel",beschreibung:"Sockelfliesen zuschneiden, verlegen und verfugen.",einheit:"lfm",preis:14},
+  {id:"F06",gewerk:"Fliesen",titel:"Treppenstufe fliesen",beschreibung:"Tritt- und Stoßstufe fliesen inkl. Kantenprofil.",einheit:"Stk",preis:85},
+  {id:"F07",gewerk:"Fliesen",titel:"Bodengleiche Dusche mit Duschrinne",beschreibung:"Duschrinne setzen, Gefälleestrich herstellen, abdichten und anschließen.",einheit:"Stk",preis:450},
+  {id:"F08",gewerk:"Fliesen",titel:"Edelstahl-Abschlussprofile",beschreibung:"Eck- und Abschlussprofile aus Edelstahl liefern und einbauen.",einheit:"lfm",preis:18},
+  {id:"F09",gewerk:"Fliesen",titel:"Silikonfugen",beschreibung:"Elastische Verfugung an Anschluss- und Bewegungsfugen mit Sanitärsilikon.",einheit:"lfm",preis:9},
+  {id:"F10",gewerk:"Fliesen",titel:"Fensterbank fliesen",beschreibung:"Fensterbank inkl. Laibungskante fliesen.",einheit:"lfm",preis:45},
+  {id:"M01",gewerk:"Fliesen",titel:"Fliesenmaterial (Richtpreis)",beschreibung:"Lieferung Fliesenmaterial nach Wahl des Kunden, Richtpreis inkl. Verschnitt.",einheit:"m²",preis:35},
+  {id:"M02",gewerk:"Fliesen",titel:"Kleber und Fugenmaterial",beschreibung:"Lieferung Fliesenkleber und Fugenmörtel.",einheit:"m²",preis:9},
+  {id:"S01",gewerk:"Allgemein",titel:"Stundenlohnarbeiten",beschreibung:"Arbeiten im Stundenlohn nach Aufwand.",einheit:"Std",preis:58},
+  {id:"S02",gewerk:"Allgemein",titel:"Anfahrt",beschreibung:"Anfahrtspauschale.",einheit:"psch",preis:45},
+  {id:"S03",gewerk:"Allgemein",titel:"Container Entsorgung",beschreibung:"Stellung und Abfuhr Container für Bauschutt.",einheit:"psch",preis:380}
+];
+const EINHEITEN = ["m²","lfm","Stk","psch","Std","m³","kg"];
+
+let S = Object.assign({}, DEFAULT_SETTINGS, store.get("settings", {}));
+let KAT = store.get("katalog", null) || DEFAULT_KATALOG.slice();
+let cur = null; // aktuelles Angebot
+
+/* ---------- Helfer ---------- */
+const $ = id => document.getElementById(id);
+const eur = n => (Number(n)||0).toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2}) + " €";
+const num = n => (Number(n)||0).toLocaleString("de-DE",{maximumFractionDigits:2});
+const round2 = n => Math.round((Number(n)||0)*100)/100;
+const esc = s => String(s??"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmtDate = d => d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
+function toast(msg, ms=3000){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
+function hexRgb(h){ const m=/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(h||""); return m?[parseInt(m[1],16),parseInt(m[2],16),parseInt(m[3],16)]:[31,78,121]; }
+
+/* ---------- Navigation ---------- */
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+function showTab(t){
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.tab===t));
+  ["angebot","archiv","katalog","einst"].forEach(x => $("tab-"+x).classList.toggle("hidden", x!==t));
+  if(t==="archiv") renderArchiv();
+  if(t==="katalog") renderKatalog();
+  window.scrollTo(0,0);
+}
+
+/* ---------- Einstellungen ---------- */
+function applyBranding(){
+  document.documentElement.style.setProperty("--brand", S.farbe);
+  document.querySelector('meta[name="theme-color"]').content = S.farbe;
+  $("hdrName").textContent = S.firma || "Angebot per Sprache";
+  $("hdrLogo").classList.toggle("hidden", !S.logo); if(S.logo) $("hdrLogo").src = S.logo;
+  $("logoPrev").classList.toggle("hidden", !S.logo); $("logoDel").classList.toggle("hidden", !S.logo); if(S.logo) $("logoPrev").src = S.logo;
+}
+document.querySelectorAll("[data-s]").forEach(el => {
+  const k = el.dataset.s;
+  if(el.type==="checkbox") el.checked = !!S[k]; else el.value = S[k] ?? "";
+  el.addEventListener("change", () => {
+    S[k] = el.type==="checkbox" ? el.checked : (el.type==="number" ? Number(el.value) : el.value.trim());
+    store.set("settings", S); applyBranding();
+  });
+});
+$("logoFile").onchange = e => {
+  const f = e.target.files[0]; if(!f) return;
+  const img = new Image();
+  img.onload = () => {
+    const sc = Math.min(1, 600/Math.max(img.width, img.height));
+    const c = document.createElement("canvas"); c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    S.logo = c.toDataURL("image/png"); S.logoW = c.width; S.logoH = c.height;
+    store.set("settings", S); applyBranding(); URL.revokeObjectURL(img.src);
+  };
+  img.src = URL.createObjectURL(f);
+};
+$("logoDel").onclick = () => { S.logo=""; store.set("settings", S); applyBranding(); };
+$("exportBtn").onclick = () => {
+  const data = {settings:Object.assign({}, S, {apiKey:""}), katalog:KAT, angebote:store.get("angebote", [])};
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:"application/json"}));
+  a.download = "angebots-app-sicherung.json"; a.click();
+};
+$("importFile").onchange = async e => {
+  const f = e.target.files[0]; if(!f) return;
+  try{
+    const d = JSON.parse(await f.text());
+    if(d.settings){ S = Object.assign({}, DEFAULT_SETTINGS, d.settings, {apiKey:S.apiKey}); store.set("settings", S); }
+    if(d.katalog){ KAT = d.katalog; store.set("katalog", KAT); }
+    if(d.angebote){ store.set("angebote", d.angebote); }
+    toast("Sicherung importiert"); setTimeout(()=>location.reload(), 800);
+  }catch(err){ toast("Datei ungültig: "+err.message); }
+};
+
+/* ---------- Katalog ---------- */
+function saveKat(){ store.set("katalog", KAT); fillKatSelect(); }
+function renderKatalog(){
+  const t = $("katTable");
+  t.innerHTML = "<tr><td><b>Nr</b></td><td><b>Leistung</b></td><td><b>Einh.</b></td><td><b>Preis €</b></td><td></td></tr>" +
+    KAT.map((p,i) => `<tr>
+      <td style="width:62px"><input data-i="${i}" data-f="id" value="${esc(p.id)}"></td>
+      <td><input data-i="${i}" data-f="titel" value="${esc(p.titel)}"><input data-i="${i}" data-f="beschreibung" value="${esc(p.beschreibung)}" style="margin-top:4px;font-size:13px;color:var(--muted)"></td>
+      <td style="width:76px"><select data-i="${i}" data-f="einheit">${EINHEITEN.map(e=>`<option${e===p.einheit?" selected":""}>${e}</option>`).join("")}</select></td>
+      <td style="width:86px"><input data-i="${i}" data-f="preis" type="number" step="0.01" value="${p.preis}"></td>
+      <td><button class="btn danger" data-del="${i}">✕</button></td></tr>`).join("");
+  t.querySelectorAll("[data-f]").forEach(el => el.onchange = () => {
+    const p = KAT[el.dataset.i]; p[el.dataset.f] = el.dataset.f==="preis" ? Number(el.value) : el.value; saveKat();
+  });
+  t.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { if(confirm("Position löschen?")){ KAT.splice(b.dataset.del,1); saveKat(); renderKatalog(); } });
+}
+$("katNeu").onclick = () => { KAT.push({id:"N"+(KAT.length+1),gewerk:"Fliesen",titel:"Neue Leistung",beschreibung:"",einheit:"m²",preis:0}); saveKat(); renderKatalog(); };
+$("katReset").onclick = () => { if(confirm("Eigenen Katalog durch Beispielkatalog ersetzen?")){ KAT = DEFAULT_KATALOG.slice(); saveKat(); renderKatalog(); } };
+function fillKatSelect(){
+  $("katAdd").innerHTML = '<option value="">+ Position aus Katalog …</option>' + KAT.map((p,i)=>`<option value="${i}">${esc(p.id)} – ${esc(p.titel)} (${eur(p.preis)}/${esc(p.einheit)})</option>`).join("");
+}
+
+/* ---------- Spracheingabe ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, recording = false;
+if(!SR){ $("micBtn").classList.add("hidden"); $("micHint").textContent = "Tipp: Im Textfeld das Mikrofon der Handy-Tastatur antippen und frei sprechen."; }
+$("micBtn").onclick = () => recording ? stopRec() : startRec();
+function startRec(){
+  rec = new SR(); rec.lang = "de-DE"; rec.continuous = true; rec.interimResults = false;
+  rec.onresult = e => {
+    for(let i=e.resultIndex; i<e.results.length; i++) if(e.results[i].isFinal){
+      const ta = $("diktat"); ta.value = (ta.value.trim() + " " + e.results[i][0].transcript.trim()).trim();
+    }
+  };
+  rec.onerror = e => { if(e.error==="not-allowed"){ toast("Mikrofon nicht erlaubt"); stopRec(); } };
+  rec.onend = () => { if(recording) try{ rec.start(); }catch(_){} }; // Handys stoppen nach Pausen
+  rec.start(); recording = true;
+  $("micBtn").classList.add("rec"); $("micBtn").textContent = "⏹ Aufnahme beenden";
+}
+function stopRec(){
+  recording = false; try{ rec && rec.stop(); }catch(_){}
+  $("micBtn").classList.remove("rec"); $("micBtn").textContent = "🎤 Aufnahme starten";
+}
+
+/* ---------- KI ---------- */
+const SCHEMA = {
+  type:"object", additionalProperties:false,
+  required:["kunde","bauvorhaben","einleitung","positionen","rueckfragen"],
+  properties:{
+    kunde:{type:"object",additionalProperties:false,required:["name","strasse","plz_ort","email","telefon"],
+      properties:{name:{type:"string"},strasse:{type:"string"},plz_ort:{type:"string"},email:{type:"string"},telefon:{type:"string"}}},
+    bauvorhaben:{type:"string"},
+    einleitung:{type:"string"},
+    positionen:{type:"array",items:{type:"object",additionalProperties:false,
+      required:["gruppe","katalog_id","titel","beschreibung","menge","einheit","einzelpreis","pruefen"],
+      properties:{gruppe:{type:"string"},katalog_id:{type:"string"},titel:{type:"string"},beschreibung:{type:"string"},
+        menge:{type:"number"},einheit:{type:"string"},einzelpreis:{type:"number"},pruefen:{type:"boolean"}}}},
+    rueckfragen:{type:"array",items:{type:"string"}}
+  }
+};
+
+function systemPrompt(){
+  return `Du bist die Kalkulationshilfe eines Fliesenleger- und Ausbaubetriebs (${S.firma}). Der Inhaber spricht auf der Baustelle frei ein, was er gesehen hat und anbieten will. Du machst daraus die Positionen eines Angebots.
+
+Regeln:
+- Nutze bevorzugt Positionen aus dem Leistungskatalog (katalog_id, titel, einheit und einzelpreis exakt aus dem Katalog übernehmen; beschreibung darf um Details aus dem Diktat ergänzt werden, z. B. Fliesenformat oder Raum).
+- Mengen aus genannten Maßen berechnen. Bodenfläche = Länge × Breite. Wandfläche = Umfang × Höhe, abzüglich Türen/Fenster nur wenn genannt. Rechne auf zwei Nachkommastellen. Den Rechenweg kurz in die beschreibung schreiben (z. B. "(2,40 × 3,00 m)").
+- Sinnvolle Begleitpositionen, die fachlich zwingend dazugehören (z. B. Abdichtung im Duschbereich, Silikonfugen, Material), darfst du ergänzen, aber setze dann pruefen=true.
+- Leistungen, die nicht im Katalog stehen: katalog_id="" (leerer String), realistischer Netto-Marktpreis als Schätzung, pruefen=true.
+- Fehlt eine Menge und lässt sie sich nicht ableiten: menge=0, pruefen=true und eine kurze Rückfrage in rueckfragen.
+- gruppe = Raum oder Bauabschnitt (z. B. "Bad OG", "Küche", "Allgemein"). Positionen derselben Gruppe zusammenhängend auflisten.
+- Kundendaten nur übernehmen, wenn sie gesagt wurden, sonst leere Strings. Erfinde keine Namen oder Adressen.
+- bauvorhaben: kurze Bezeichnung, z. B. "Badsanierung Obergeschoss, Hauptstraße 5, Musterstadt".
+- einleitung: ein bis zwei höfliche Sätze für das Angebot, Sie-Form, ohne Anrede.
+- Diktierfehler der Spracherkennung sinnvoll interpretieren.
+
+Leistungskatalog (Preise netto in Euro):
+${KAT.map(p=>`${p.id} | ${p.titel} | ${p.beschreibung} | ${p.einheit} | ${p.preis}`).join("\n")}`;
+}
+
+async function kiAuswerten(text){
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{
+      "content-type":"application/json",
+      "x-api-key":S.apiKey,
+      "anthropic-version":"2023-06-01",
+      "anthropic-beta":"server-side-fallback-2026-07-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body: JSON.stringify({
+      model:"claude-opus-5-5",
+      max_tokens:16000,
+      fallbacks:"default",
+      output_config:{effort:"medium", format:{type:"json_schema", schema:SCHEMA}},
+      system: systemPrompt(),
+      messages:[{role:"user", content:"Diktat von der Baustelle:\n\n"+text}]
+    })
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error((data.error && data.error.message) || ("HTTP "+res.status));
+  if(data.stop_reason==="refusal") throw new Error("Die KI hat die Anfrage abgelehnt.");
+  if(data.stop_reason==="max_tokens") throw new Error("Antwort wurde abgeschnitten – Diktat kürzer fassen.");
+  const txt = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("");
+  return JSON.parse(txt);
+}
+
+$("kiBtn").onclick = async () => {
+  const text = $("diktat").value.trim();
+  if(!text) return toast("Bitte erst etwas einsprechen.");
+  if(!S.apiKey){ toast("Bitte API-Schlüssel in den Einstellungen hinterlegen."); return showTab("einst"); }
+  if(recording) stopRec();
+  const b = $("kiBtn"); b.disabled = true; b.innerHTML = '<span class="spinner"></span>Angebot wird erstellt …';
+  try{
+    const r = await kiAuswerten(text);
+    neuesAngebot();
+    cur.diktat = text;
+    cur.kunde = {name:r.kunde.name, strasse:r.kunde.strasse, ort:r.kunde.plz_ort, email:r.kunde.email, tel:r.kunde.telefon};
+    cur.bauvorhaben = r.bauvorhaben; cur.einleitung = r.einleitung || cur.einleitung;
+    cur.positionen = r.positionen.map(p => {
+      const k = p.katalog_id && KAT.find(x => x.id===p.katalog_id);
+      return {gruppe:p.gruppe||"", katId:k?k.id:null, titel:p.titel, beschreibung:p.beschreibung, menge:round2(p.menge),
+        einheit:p.einheit, ep: k ? k.preis : round2(p.einzelpreis), pruefen: !k || p.pruefen || !(p.menge>0)};
+    });
+    const gOrder = [...new Set(cur.positionen.map(p=>p.gruppe))];
+    cur.positionen.sort((a,b) => gOrder.indexOf(a.gruppe) - gOrder.indexOf(b.gruppe));
+    cur.rueckfragen = r.rueckfragen || [];
+    renderEditor();
+    $("angebotEditor").scrollIntoView({behavior:"smooth"});
+  }catch(err){
+    toast("Fehler: "+err.message, 6000);
+  }finally{ b.disabled = false; b.textContent = "✨ Angebot erstellen"; }
+};
+$("leerBtn").onclick = () => { neuesAngebot(); cur.diktat = $("diktat").value.trim(); renderEditor(); };
+
+/* ---------- Angebot bearbeiten ---------- */
+function neuesAngebot(){
+  cur = {id:null, nr:null, datum:new Date().toISOString(), kunde:{name:"",strasse:"",ort:"",email:"",tel:""}, bauvorhaben:"",
+    einleitung:"vielen Dank für Ihre Anfrage. Gerne bieten wir Ihnen die folgenden Leistungen an:", positionen:[], rueckfragen:[], reverseCharge:false};
+}
+const kundeFelder = {k_name:"name",k_strasse:"strasse",k_ort:"ort",k_email:"email",k_tel:"tel"};
+Object.entries(kundeFelder).forEach(([id,f]) => $(id).oninput = e => { cur.kunde[f] = e.target.value; });
+$("bauvorhaben").oninput = e => cur.bauvorhaben = e.target.value;
+$("einleitung").oninput = e => cur.einleitung = e.target.value;
+
+function renderEditor(){
+  $("angebotEditor").classList.remove("hidden");
+  Object.entries(kundeFelder).forEach(([id,f]) => $(id).value = cur.kunde[f]||"");
+  $("bauvorhaben").value = cur.bauvorhaben||""; $("einleitung").value = cur.einleitung||"";
+  $("rueckfragen").innerHTML = cur.rueckfragen.length ? `<div class="warnbox"><b>Rückfragen der KI:</b><ul>${cur.rueckfragen.map(q=>`<li>${esc(q)}</li>`).join("")}</ul></div>` : "";
+  renderPositionen();
+}
+function nummern(){ // 1.1, 1.2, 2.1 … nach Gruppe
+  const gr = []; return cur.positionen.map(p => { let g = gr.indexOf(p.gruppe); if(g<0){ gr.push(p.gruppe); g = gr.length-1; }
+    return (g+1)+"."+(cur.positionen.filter((q,i)=>q.gruppe===p.gruppe && i<=cur.positionen.indexOf(p)).length); });
+}
+function renderPositionen(){
+  const nr = nummern(); let lastG = null;
+  $("positionen").innerHTML = cur.positionen.map((p,i) => {
+    const head = p.gruppe!==lastG ? `<div style="font-weight:600;margin:10px 0 6px">${esc(p.gruppe||"Ohne Gruppe")}</div>` : ""; lastG = p.gruppe;
+    return head + `<div class="pos${p.pruefen?" check":""}">
+      <div class="top"><span class="nr">${nr[i]}</span><input data-i="${i}" data-f="titel" value="${esc(p.titel)}"><button class="btn danger" data-del="${i}">✕</button></div>
+      <textarea data-i="${i}" data-f="beschreibung" style="margin-top:6px">${esc(p.beschreibung)}</textarea>
+      <div class="grid">
+        <div><label>Menge</label><input data-i="${i}" data-f="menge" type="number" step="0.01" inputmode="decimal" value="${p.menge}"></div>
+        <div><label>Einheit</label><select data-i="${i}" data-f="einheit">${[...new Set([p.einheit,...EINHEITEN])].map(e=>`<option${e===p.einheit?" selected":""}>${esc(e)}</option>`).join("")}</select></div>
+        <div><label>EP netto €</label><input data-i="${i}" data-f="ep" type="number" step="0.01" inputmode="decimal" value="${p.ep}"></div>
+      </div>
+      <div class="top" style="margin-top:6px"><label style="margin:0"><input type="checkbox" data-ok="${i}" ${p.pruefen?"":"checked"} style="width:auto"> geprüft</label>
+        <input data-i="${i}" data-f="gruppe" value="${esc(p.gruppe)}" placeholder="Gruppe/Raum" style="max-width:150px;font-size:13px">
+        <span class="gp" id="gp${i}">${eur(p.menge*p.ep)}</span></div>
+    </div>`;
+  }).join("") || '<p class="hint">Noch keine Positionen.</p>';
+  $("positionen").querySelectorAll("[data-f]").forEach(el => {
+    el.oninput = () => {
+      const p = cur.positionen[el.dataset.i], f = el.dataset.f;
+      p[f] = (f==="menge"||f==="ep") ? Number(el.value) : el.value;
+      if(f==="menge"||f==="ep"){ $("gp"+el.dataset.i).textContent = eur(p.menge*p.ep); renderSummen(); }
+    };
+    if(el.dataset.f==="gruppe") el.onchange = renderPositionen;
+  });
+  $("positionen").querySelectorAll("[data-ok]").forEach(c => c.onchange = () => { cur.positionen[c.dataset.ok].pruefen = !c.checked; renderPositionen(); });
+  $("positionen").querySelectorAll("[data-del]").forEach(b => b.onclick = () => { cur.positionen.splice(b.dataset.del,1); renderPositionen(); });
+  renderSummen();
+}
+function summen(){
+  const netto = round2(cur.positionen.reduce((s,p)=>s+round2(p.menge*p.ep),0));
+  const satz = cur.reverseCharge ? 0 : Number(S.mwst)||0;
+  const mwst = round2(netto*satz/100);
+  return {netto, satz, mwst, brutto:round2(netto+mwst)};
+}
+function renderSummen(){
+  const s = summen();
+  $("summen").innerHTML = `Netto: ${eur(s.netto)}<br>MwSt. ${s.satz} %: ${eur(s.mwst)}<br><b>Gesamt: ${eur(s.brutto)}</b>` +
+    (S.reverseCharge ? `<br><label style="display:inline"><input type="checkbox" id="rcBox" ${cur.reverseCharge?"checked":""} style="width:auto"> §13b – Kunde ist Bauunternehmer</label>` : "");
+  const rc = $("rcBox"); if(rc) rc.onchange = () => { cur.reverseCharge = rc.checked; renderSummen(); };
+}
+$("katAdd").onchange = e => {
+  const k = KAT[e.target.value]; if(!k) return;
+  const g = cur.positionen.length ? cur.positionen[cur.positionen.length-1].gruppe : "Allgemein";
+  cur.positionen.push({gruppe:g, katId:k.id, titel:k.titel, beschreibung:k.beschreibung, menge:0, einheit:k.einheit, ep:k.preis, pruefen:true});
+  e.target.value = ""; renderPositionen();
+};
+$("freiAdd").onclick = () => {
+  const g = cur.positionen.length ? cur.positionen[cur.positionen.length-1].gruppe : "Allgemein";
+  cur.positionen.push({gruppe:g, katId:null, titel:"", beschreibung:"", menge:1, einheit:"psch", ep:0, pruefen:true}); renderPositionen();
+};
+
+/* ---------- Speichern / Archiv ---------- */
+function speichern(){
+  if(!cur.nr){ const n = Number(S.nextNr)||1; cur.nr = new Date().getFullYear()+"-"+String(n).padStart(3,"0"); S.nextNr = n+1; store.set("settings", S);
+    const el = document.querySelector('[data-s="nextNr"]'); if(el) el.value = S.nextNr; }
+  if(!cur.id) cur.id = Date.now().toString(36);
+  const all = store.get("angebote", []); const i = all.findIndex(a=>a.id===cur.id);
+  const copy = JSON.parse(JSON.stringify(cur)); if(i>=0) all[i] = copy; else all.unshift(copy);
+  store.set("angebote", all);
+}
+$("saveBtn").onclick = () => { speichern(); toast("Angebot "+cur.nr+" gespeichert"); };
+function renderArchiv(){
+  const all = store.get("angebote", []);
+  $("archivList").innerHTML = all.length ? all.map(a => { const old=cur; cur=a; const s=summen(); cur=old;
+    return `<div class="list-item"><div><b>${esc(a.nr)}</b> · ${esc(a.kunde.name||"ohne Name")}<br><span class="hint">${fmtDate(new Date(a.datum))} · ${esc(a.bauvorhaben||"")} · ${eur(s.brutto)}</span></div>
+      <div style="white-space:nowrap"><button class="btn sec" data-open="${a.id}">Öffnen</button> <button class="btn danger" data-del="${a.id}">✕</button></div></div>`; }).join("")
+    : '<p class="hint">Noch keine Angebote gespeichert.</p>';
+  $("archivList").querySelectorAll("[data-open]").forEach(b => b.onclick = () => {
+    cur = JSON.parse(JSON.stringify(all.find(a=>a.id===b.dataset.open))); $("diktat").value = cur.diktat||""; showTab("angebot"); renderEditor();
+  });
+  $("archivList").querySelectorAll("[data-del]").forEach(b => b.onclick = () => {
+    if(!confirm("Angebot löschen?")) return; store.set("angebote", all.filter(a=>a.id!==b.dataset.del)); renderArchiv();
+  });
+}
+
+/* ---------- PDF ---------- */
+function pdfErstellen(){
+  if(!cur.nr) speichern();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:"mm", format:"a4"});
+  const C = hexRgb(S.farbe), W = 210, L = 20, R = 190;
+  const datum = new Date(cur.datum), bis = new Date(datum.getTime() + (Number(S.gueltig)||30)*864e5);
+
+  // Kopf
+  doc.setFillColor(...C); doc.rect(0, 0, W, 4, "F");
+  if(S.logo){ const h = 20, w = Math.min(70, h*(S.logoW||3)/(S.logoH||1)); try{ doc.addImage(S.logo, "PNG", L, 12, w, w*(S.logoH||1)/(S.logoW||3)); }catch(e){} }
+  else { doc.setFont("helvetica","bold"); doc.setFontSize(18); doc.setTextColor(...C); doc.text(S.firma||"", L, 24); }
+  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(80);
+  [S.firma, S.strasse, S.ort, S.tel && "Tel. "+S.tel, S.email, S.web].filter(Boolean).forEach((t,i) => doc.text(t, R, 14+i*4.2, {align:"right"}));
+
+  // Anschrift (DIN 5008 Fenster)
+  doc.setFontSize(7); doc.setTextColor(120);
+  doc.text([S.firma, S.strasse, S.ort].filter(Boolean).join(" · "), L, 50);
+  doc.setDrawColor(200); doc.line(L, 51.5, L+85, 51.5);
+  doc.setFontSize(11); doc.setTextColor(20);
+  [cur.kunde.name, cur.kunde.strasse, cur.kunde.ort].filter(Boolean).forEach((t,i) => doc.text(t, L, 58+i*5.2));
+
+  // Infoblock
+  doc.setFontSize(9);
+  [["Angebot-Nr.", cur.nr], ["Datum", fmtDate(datum)], ["Gültig bis", fmtDate(bis)]].forEach(([k,v],i) => {
+    doc.setTextColor(110); doc.text(k, 140, 58+i*5); doc.setTextColor(20); doc.text(String(v), R, 58+i*5, {align:"right"});
+  });
+
+  // Titel & Einleitung
+  let y = 98;
+  doc.setFont("helvetica","bold"); doc.setFontSize(15); doc.setTextColor(...C); doc.text("Angebot Nr. "+cur.nr, L, y);
+  y += 6;
+  if(cur.bauvorhaben){ doc.setFontSize(10.5); doc.setTextColor(20); doc.text("Bauvorhaben: "+cur.bauvorhaben, L, y, {maxWidth:R-L}); y += 6; }
+  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(20);
+  y += 3; doc.text("Sehr geehrte Damen und Herren,", L, y); y += 6;
+  const ein = doc.splitTextToSize(cur.einleitung||"", R-L); doc.text(ein, L, y); y += ein.length*4.6 + 3;
+
+  // Tabelle mit Gruppenköpfen
+  const nr = nummern(), body = []; let lastG = null; const grpSum = {};
+  cur.positionen.forEach(p => grpSum[p.gruppe] = round2((grpSum[p.gruppe]||0) + round2(p.menge*p.ep)));
+  cur.positionen.forEach((p,i) => {
+    if(p.gruppe!==lastG){
+      if(lastG!==null && Object.keys(grpSum).length>1) body.push([{content:"Summe "+lastG, colSpan:5, styles:{halign:"right",fontStyle:"italic"}},{content:eur(grpSum[lastG]),styles:{fontStyle:"italic"}}]);
+      body.push([{content:(nr[i].split(".")[0])+"  "+(p.gruppe||""), colSpan:6, styles:{fontStyle:"bold", fillColor:[C[0],C[1],C[2]].map(c=>Math.round(c*0.12+255*0.88))}}]);
+      lastG = p.gruppe;
+    }
+    body.push([nr[i], {content:(p.titel||"")+(p.beschreibung?"\n"+p.beschreibung:"")}, num(p.menge), p.einheit, eur(p.ep), eur(p.menge*p.ep)]);
+  });
+  if(lastG!==null && Object.keys(grpSum).length>1) body.push([{content:"Summe "+lastG, colSpan:5, styles:{halign:"right",fontStyle:"italic"}},{content:eur(grpSum[lastG]),styles:{fontStyle:"italic"}}]);
+
+  doc.autoTable({
+    startY:y, margin:{left:L, right:W-R, top:20, bottom:30},
+    head:[["Pos.","Leistung","Menge","Einh.","EP netto","GP netto"]], body,
+    theme:"plain", styles:{font:"helvetica", fontSize:9, cellPadding:{top:1.8,bottom:1.8,left:1.5,right:1.5}, textColor:20, valign:"top"},
+    headStyles:{fillColor:C, textColor:255, fontStyle:"bold"},
+    columnStyles:{0:{cellWidth:12},2:{cellWidth:16,halign:"right"},3:{cellWidth:12},4:{cellWidth:24,halign:"right"},5:{cellWidth:26,halign:"right"}},
+    didParseCell: d => { if(d.section==="head" && d.column.index>=4) d.cell.styles.halign = "right"; if(d.section==="head" && d.column.index===2) d.cell.styles.halign="right"; },
+    didDrawCell: d => { if(d.section==="body" && d.row.raw.length===6){ doc.setDrawColor(225); doc.line(d.cell.x, d.cell.y+d.cell.height, d.cell.x+d.cell.width, d.cell.y+d.cell.height); } }
+  });
+
+  // Summen
+  const s = summen(); y = doc.lastAutoTable.finalY + 6;
+  if(y > 240){ doc.addPage(); y = 25; }
+  doc.setFontSize(10); doc.setTextColor(20);
+  const zeile = (k,v,b) => { doc.setFont("helvetica", b?"bold":"normal"); doc.text(k, 140, y, {align:"right"}); doc.text(v, R, y, {align:"right"}); y += 5.5; };
+  zeile("Summe netto", eur(s.netto));
+  if(cur.reverseCharge) zeile("Umsatzsteuer", "0,00 €"); else zeile("zzgl. "+s.satz+" % MwSt.", eur(s.mwst));
+  doc.setDrawColor(...C); doc.setLineWidth(0.5); doc.line(110, y-3.5, R, y-3.5); doc.setLineWidth(0.2);
+  y += 1; zeile("Angebotssumme", eur(s.brutto), true);
+  y += 4;
+
+  // Schlusstexte
+  doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
+  const texte = [];
+  if(cur.reverseCharge) texte.push("Steuerschuldnerschaft des Leistungsempfängers gemäß § 13b UStG.");
+  texte.push("Zahlungsbedingungen: "+(S.zahlung||""));
+  texte.push("Dieses Angebot ist gültig bis "+fmtDate(bis)+". Mengen werden nach tatsächlichem Aufmaß abgerechnet.");
+  texte.push(S.schluss||"");
+  texte.push("Mit freundlichen Grüßen\n"+(S.inhaber||"")+(S.inhaber&&S.firma?" · ":"")+(S.firma||""));
+  texte.filter(Boolean).forEach(t => { const ls = doc.splitTextToSize(t, R-L); if(y + ls.length*4.2 > 268){ doc.addPage(); y = 25; } doc.text(ls, L, y); y += ls.length*4.2 + 2.5; });
+
+  // Fußzeile alle Seiten
+  const pages = doc.getNumberOfPages();
+  for(let p=1; p<=pages; p++){
+    doc.setPage(p); doc.setDrawColor(...C); doc.setLineWidth(0.3); doc.line(L, 272, R, 272);
+    doc.setFontSize(7.5); doc.setTextColor(100); doc.setFont("helvetica","normal");
+    const sp = [[S.firma, S.inhaber && "Inh. "+S.inhaber, S.strasse, S.ort],
+                [S.tel && "Tel. "+S.tel, S.email, S.web],
+                [S.bank, S.iban && "IBAN "+S.iban, S.bic && "BIC "+S.bic],
+                [S.steuernr && "St.-Nr. "+S.steuernr, S.ustid && "USt-IdNr. "+S.ustid]];
+    sp.forEach((col,i) => doc.text(col.filter(Boolean), L + i*44, 276));
+    doc.text("Seite "+p+" von "+pages, R, 292, {align:"right"});
+  }
+  return doc;
+}
+function dateiname(){ return "Angebot_"+cur.nr+"_"+(cur.kunde.name||"Kunde").replace(/[^\wäöüÄÖÜß-]+/g,"_")+".pdf"; }
+function vorPdf(){
+  if(!cur.positionen.length){ toast("Keine Positionen vorhanden."); return false; }
+  const offen = cur.positionen.filter(p=>p.pruefen).length;
+  if(offen && !confirm(offen+" Position(en) sind noch nicht geprüft. Trotzdem PDF erstellen?")) return false;
+  speichern(); return true;
+}
+$("pdfBtn").onclick = () => { if(!vorPdf()) return; const d = pdfErstellen(); window.open(URL.createObjectURL(d.output("blob")), "_blank"); };
+$("sendBtn").onclick = async () => {
+  if(!vorPdf()) return;
+  const blob = pdfErstellen().output("blob"), name = dateiname();
+  const file = new File([blob], name, {type:"application/pdf"});
+  const betreff = "Angebot "+cur.nr+(cur.kunde.name?" – "+cur.kunde.name:"");
+  const text = "Angebot "+cur.nr+" für "+(cur.kunde.name||"Kunde")+(cur.kunde.email?" ("+cur.kunde.email+")":"")+" – "+eur(summen().brutto)+" brutto.";
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title:betreff, text}); return; }catch(e){ if(e.name==="AbortError") return; }
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  if(S.email) setTimeout(() => location.href = "mailto:"+encodeURIComponent(S.email)+"?subject="+encodeURIComponent(betreff)+"&body="+encodeURIComponent(text+"\n\nBitte das heruntergeladene PDF anhängen: "+name), 600);
+  else toast("PDF heruntergeladen. Tipp: E-Mail-Adresse in den Einstellungen eintragen.");
+};
+
+/* ---------- Start ---------- */
+applyBranding(); fillKatSelect();
+if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
