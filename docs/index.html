@@ -370,17 +370,23 @@ function fillKatSelect(){
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
 const ANDROID = /Android/.test(navigator.userAgent);
-const STANDALONE = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
 const TASTATUR_TIPP = "Ins Textfeld tippen und das Mikrofon-Symbol der Handy-Tastatur nutzen – das funktioniert immer.";
 let rec = null, recording = false, gehoert = false, neustarts = [];
-function micAus(grund){
-  $("micBtn").classList.add("hidden"); $("micLabel").classList.add("hidden");
-  $("micHint").textContent = (grund ? grund+" " : "") + TASTATUR_TIPP;
+// Auf dem iPhone ist die Browser-Spracherkennung unzuverlässig. Dort öffnet der Mikrofon-Knopf
+// das Textfeld mit Tastatur, und es wird mit der eingebauten Diktierfunktion der Tastatur gesprochen.
+const TASTATUR_MODUS = IOS || !SR;
+if(TASTATUR_MODUS){
+  $("micLabel").textContent = "Tippen, dann Mikrofon der Tastatur";
+  $("micHint").textContent = "Die Tastatur öffnet sich. Unten auf das Mikrofon-Symbol tippen und frei sprechen.";
 }
-// Auf dem iPhone funktioniert die Browser-Spracherkennung als Startbildschirm-App nicht zuverlässig.
-if(!SR) micAus("");
-else if(IOS && STANDALONE) micAus("Auf dem iPhone bitte so diktieren:");
-$("micBtn").onclick = () => recording ? stopRec() : startRec();
+$("micBtn").onclick = () => {
+  if(TASTATUR_MODUS){
+    const ta = $("diktat"); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+    toast("Jetzt unten auf der Tastatur das Mikrofon-Symbol tippen. Fehlt es: Einstellungen → Allgemein → Tastatur → „Diktierfunktion aktivieren“.", 8000);
+    return;
+  }
+  recording ? stopRec() : startRec();
+};
 function startRec(){
   rec = new SR(); rec.lang = "de-DE"; rec.interimResults = true;
   rec.continuous = !ANDROID; // Android liefert im Dauermodus doppelte Texte, dort Satz für Satz neu starten
